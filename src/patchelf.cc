@@ -47,7 +47,11 @@ static bool debugMode = false;
 static bool forceRPath = false;
 
 static string fileName;
-static int pageSize = PAGESIZE;
+#ifdef DEFAULT_PAGESIZE
+static int forcedPageSize = DEFAULT_PAGESIZE;
+#else
+static int forcedPageSize = -1;
+#endif
 
 off_t fileSize, maxSize;
 unsigned char * contents = 0;
@@ -55,11 +59,6 @@ unsigned char * contents = 0;
 
 #define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym
 #define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym
-
-
-static unsigned int getPageSize(){
-    return pageSize;
-}
 
 
 template<ElfFileParams>
@@ -130,6 +129,8 @@ private:
     };
 
     friend struct CompShdr;
+
+    unsigned int getPageSize() const;
 
     void sortShdrs();
 
@@ -332,6 +333,29 @@ void ElfFile<ElfFileParamNames>::parse()
     sectionsByOldIndex.resize(hdr->e_shnum);
     for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i)
         sectionsByOldIndex[i] = getSectionName(shdrs[i]);
+}
+
+
+template<ElfFileParams>
+unsigned int ElfFile<ElfFileParamNames>::getPageSize() const
+{
+    if (forcedPageSize > 0)
+        return forcedPageSize;
+
+    // Architectures (and ABIs) can have different minimum section alignment
+    // requirements. There is no authoritative list of these values. The
+    // current list is extracted from GNU gold's source code (abi_pagesize).
+    switch (hdr->e_machine) {
+      case EM_SPARC:
+      case EM_MIPS:
+      case EM_PPC:
+      case EM_PPC64:
+      case EM_AARCH64:
+      case EM_TILEGX:
+        return 0x10000;
+      default:
+        return 0x1000;
+    }
 }
 
 
@@ -1466,10 +1490,7 @@ static void patchElf()
     if (!printInterpreter && !printRPath && !printSoname && !printNeeded)
         debug("patching ELF file `%s'\n", fileName.c_str());
 
-    debug("Kernel page size is %u bytes\n", getPageSize());
-
     readFile(fileName);
-
 
     /* Check the ELF header for basic validity. */
     if (fileSize < (off_t) sizeof(Elf32_Ehdr)) error("missing ELF header");
@@ -1537,9 +1558,9 @@ int main(int argc, char * * argv)
         }
         else if (arg == "--page-size") {
             if (++i == argc) error("missing argument");
-            pageSize = atoi(argv[i]);
-            if (pageSize <= 0) error("invalid argument to --page-size");
-	}
+            forcedPageSize = atoi(argv[i]);
+            if (forcedPageSize <= 0) error("invalid argument to --page-size");
+        }
         else if (arg == "--print-interpreter") {
             printInterpreter = true;
         }
