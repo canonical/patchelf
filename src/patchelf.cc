@@ -863,6 +863,23 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
 
     startPage = roundUp(startPage, alignStartPage);
 
+    // Determine base vaddr from base PT_LOAD to handle non-zero base ET_EXEC when PT_PHDR is absent:
+    // https://github.com/canonical/snapcraft/blob/d6a8ffe9a513719aca8dfc238ae1319307f28edc/snap/local/patches/patchelf/0002-Fix-rewriteSectionsLibrary-to-not-assume-the-base-ad.patch
+    Elf_Phdr *base_pt_load = nullptr;
+    for (auto & phdr : phdrs) {
+        if (rdi(phdr.p_type) == PT_LOAD && rdi(phdr.p_offset) == 0) {
+            base_pt_load = &phdr;
+            break;
+        }
+    }
+    assert(base_pt_load != nullptr);
+    Elf_Addr base_vaddr = rdi(base_pt_load->p_vaddr);
+
+    if (firstPage == 0) {
+        firstPage = base_vaddr;
+    }
+
+    debug("base virtual address is 0x%llx\n", (unsigned long long) base_vaddr);
     debug("last page is 0x%llx\n", (unsigned long long) startPage);
     debug("first page is 0x%llx\n", (unsigned long long) firstPage);
 
