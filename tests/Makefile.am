@@ -37,8 +37,6 @@ src_TESTS = \
   no-gnu-hash.sh \
   change-abi.sh \
   grow-file.sh \
-  executable-page-growth.sh \
-  strip-gap-rewrite.sh \
   no-dynamic-section.sh \
   args-from-file.sh \
   basic-flags.sh \
@@ -66,7 +64,12 @@ src_TESTS = \
   empty-note.sh \
   set-interpreter-same.sh \
   property-rewrite.sh \
-  large-page-dynamic.sh
+  large-page-dynamic.sh \
+  no-vaddr-underrun.sh
+
+# The following tests tested rewriteSectionsExecutable() which was removed in NixOS/patchelf#637:
+# executable-page-growth.sh
+# strip-gap-rewrite.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
@@ -110,11 +113,16 @@ main_DEPENDENCIES = libfoo.so
 main_LDFLAGS = $(LDFLAGS_local)
 
 # Non-PIE (ET_EXEC) variant of main, to exercise rewriteSectionsExecutable().
+# Carries a concrete DT_RPATH to the build directory so
+# build-resolution-cache-no-pie.sh can resolve the run path without first
+# rewriting sections with patchelf: after the vaddr-underrun fix, patching a
+# non-PIE binary moves the section header table off the end of the file, which
+# would make pad-to-page's "SHT ends on a page boundary" layout impossible.
 main_no_pie_SOURCES = main.c
 main_no_pie_CFLAGS = -fno-pie
 main_no_pie_LDADD = -lfoo $(AM_LDADD)
 main_no_pie_DEPENDENCIES = libfoo.so
-main_no_pie_LDFLAGS = $(LDFLAGS_local) -no-pie
+main_no_pie_LDFLAGS = $(LDFLAGS_local) -no-pie -Wl,-rpath,`pwd`
 
 # With an rpath already present, --set-rpath moves .dynstr but not .dynamic;
 # see strip-gap-rewrite.sh.
