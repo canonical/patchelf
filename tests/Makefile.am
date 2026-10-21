@@ -37,8 +37,6 @@ src_TESTS = \
   no-gnu-hash.sh \
   change-abi.sh \
   grow-file.sh \
-  executable-page-growth.sh \
-  strip-gap-rewrite.sh \
   no-dynamic-section.sh \
   args-from-file.sh \
   basic-flags.sh \
@@ -68,6 +66,10 @@ src_TESTS = \
   property-rewrite.sh \
   large-page-dynamic.sh \
   no-vaddr-underrun.sh
+
+# The following tests tested rewriteSectionsExecutable() which was removed in NixOS/patchelf#637:
+# executable-page-growth.sh
+# strip-gap-rewrite.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
