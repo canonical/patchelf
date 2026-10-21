@@ -866,6 +866,25 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
 
     startPage = roundUp(startPage, alignStartPage);
 
+    // Find file's base virtual address.
+    // XXX wgrant: Assumes that there's a PT_LOAD from the start of the file,
+    // and that the PHT falls within it.
+    Elf_Phdr *base_pt_load = nullptr;
+    for (auto & phdr : phdrs) {
+        if (rdi(phdr.p_type) == PT_LOAD && rdi(phdr.p_offset) == 0) {
+            base_pt_load = &phdr;
+            break;
+        }
+    }
+    if (base_pt_load == nullptr)
+        error("no PT_LOAD starts at file offset 0; cannot determine base address");
+    Elf_Addr base_vaddr = rdi(base_pt_load->p_vaddr);
+
+    if (firstPage == 0) {
+        firstPage = base_vaddr;
+    }
+
+    debug("base virtual address is 0x%llx\n", (unsigned long long) base_vaddr);
     debug("last page is 0x%llx\n", (unsigned long long) startPage);
     debug("first page is 0x%llx\n", (unsigned long long) firstPage);
 
